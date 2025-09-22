@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>클래식 공연 정보 수집기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="url"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .success {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .performance-list {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .performance-item {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        
+        .performance-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+        }
+        
+        .performance-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .performance-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .performance-date {
+            color: #667eea;
+            font-weight: 500;
+        }
+        
+        .performance-venue {
+            color: #764ba2;
+        }
+        
+        .delete-btn {
+            background: #ff4444;
+            padding: 8px 15px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 50px auto;
+            padding: 30px;
+            max-width: 800px;
+            border-radius: 15px;
+            position: relative;
+        }
+        
+        .close-modal {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .close-modal:hover {
+            color: #333;
+        }
+        
+        .detail-section {
+            margin-bottom: 20px;
+        }
+        
+        .detail-label {
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .detail-content {
+            padding: 10px;
+            background: #f8f8f8;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        
+        .program-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .program-list li {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-radius: 0;
+            color: #666;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            margin-bottom: -2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎼 클래식 공연 정보 수집기</h1>
+        
+        <div class="card">
+            <h2>공연 정보 스크래핑</h2>
+            <div class="input-group">
+                <input 
+                    type="url" 
+                    id="urlInput" 
+                    placeholder="공연 정보 웹페이지 URL을 입력하세요 (예: https://www.sac.or.kr/...)"
+                >
+                <button onclick="scrapePerformance()" id="scrapeBtn">
+                    정보 수집
+                </button>
+            </div>
+            <div id="message"></div>
+        </div>
+        
+        <div class="card">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('saved')">저장된 공연</button>
+                <button class="tab" onclick="showTab('recent')">최근 스크래핑</button>
+            </div>
+            
+            <div id="savedTab" class="tab-content">
+                <div id="performanceList" class="performance-list">
+                    <div class="empty-state">저장된 공연 정보가 없습니다.</div>
+                </div>
+            </div>
+            
+            <div id="recentTab" class="tab-content" style="display: none;">
+                <div id="recentResult"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+    
+    <script>
+        let performances = [];
+        let recentData = null;
+        
+        // 페이지 로드시 저장된 공연 목록 불러오기
+        window.onload = () => {
+            loadPerformances();
+        };
+        
+        // 탭 전환
+        function showTab(tab) {
+            const tabs = document.querySelectorAll('.tab');
+            const savedTab = document.getElementById('savedTab');
+            const recentTab = document.getElementById('recentTab');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'saved') {
+                tabs[0].classList.add('active');
+                savedTab.style.display = 'block';
+                recentTab.style.display = 'none';
+            } else {
+                tabs[1].classList.add('active');
+                savedTab.style.display = 'none';
+                recentTab.style.display = 'block';
+            }
+        }
+        
+        // 공연 정보 스크래핑
+        async function scrapePerformance() {
+            const url = document.getElementById('urlInput').value.trim();
+            const messageDiv = document.getElementById('message');
+            const button = document.getElementById('scrapeBtn');
+            
+            if (!url) {
+                showMessage('URL을 입력해주세요.', 'error');
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = '수집 중...';
+            messageDiv.innerHTML = '<div class="loading">웹페이지를 분석하고 있습니다. 잠시만 기다려주세요...</div>';
+            
+            try {
+                const response = await fetch('/api/scrape', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage('공연 정보를 성공적으로 수집했습니다!', 'success');
+                    recentData = result.data;
+                    displayRecentResult(result.data);
+                    showTab('recent');
+                    loadPerformances(); // 목록 새로고침
+                    document.getElementById('urlInput').value = '';
+                } else {
+                    showMessage(`오류: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`네트워크 오류: ${error.message}`, 'error');
+            } finally {
+                button.disabled = false;
+                button.textContent = '정보 수집';
+            }
+        }
+        
+        // 메시지 표시
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="${type}">${text}</div>`;
+            
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+        
+        // 최근 스크래핑 결과 표시
+        function displayRecentResult(data) {
+            const recentDiv = document.getElementById('recentResult');
+            
+            let html = `
+                <div class="performance-item">
+                    <div class="performance-title">${data.title || '제목 없음'}</div>
+                    ${data.date ? `<div class="performance-meta performance-date">📅 ${data.date}</div>` : ''}
+                    ${data.venue ? `<div class="performance-meta performance-venue">📍 ${data.venue}</div>` : ''}
+                    ${data.price ? `<div class="performance-meta">💰 ${data.price}</div>` : ''}
+                    ${data.performers && data.performers.length > 0 ? `
+                        <div class="performance-meta">👥 ${data.performers.slice(0, 3).join(', ')}${data.performers.length > 3 ? ' 외' : ''}</div>
+                    ` : ''}
+                    <button onclick='showDetail(${JSON.stringify(data).replace(/'/g, "&apos;")})'  style="margin-top: 10px;">
+                        상세 정보 보기
+                    </button>
+                </div>
+            `;
+            
+            recentDiv.innerHTML = html;
+        }
+        
+        // 저장된 공연 목록 불러오기
+        async function loadPerformances() {
+            try {
+                const response = await fetch('/api/performances');
+                performances = await response.json();
+                displayPerformances();
+            } catch (error) {
+                console.error('Failed to load performances:', error);
+            }
+        }
+        
+        // 공연 목록 표시
+        function displayPerformances() {
+            const listDiv = document.getElementById('performanceList');
+            
+            if (performances.length === 0) {
+                listDiv.innerHTML = '<div class="empty-state">저장된 공연 정보가 없습니다.</div>';
+                return;
+            }
+            
+            let html = '';
+            performances.forEach(perf => {
+                html += `
+                    <div class="performance-item" onclick='showDetail(${JSON.stringify(perf).replace(/'/g, "&apos;")})'>
+                        <div class="performance-title">${perf.title || '제목 없음'}</div>
+                        ${perf.date ? `<div class="performance-meta performance-date">📅 ${perf.date}</div>` : ''}
+                        ${perf.venue ? `<div class="performance-meta performance-venue">📍 ${perf.venue}</div>` : ''}
+                        ${perf.price ? `<div class="performance-meta">💰 ${perf.price}</div>` : ''}
+                        <div class="performance-meta">🕐 ${new Date(perf.scrapedAt).toLocaleString('ko-KR')}</div>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deletePerformance('${perf.id}')">삭제</button>
+                    </div>
+                `;
+            });
+            
+            listDiv.innerHTML = html;
+        }
+        
+        // 상세 정보 표시
+        function showDetail(performance) {
+            const modal = document.getElementById('detailModal');
+            const modalBody = document.getElementById('modalBody');
+            
+            let html = `
+                <h2>${performance.title || '제목 없음'}</h2>
+                
+                ${performance.date ? `
+                    <div class="detail-section">
+                        <div class="detail-label">📅 공연 날짜</div>
+                        <div class="detail-content">${performance.date}</div>
+                    </div>
+                ` : ''}
+                
+                ${performance.venue ? `
+                    <div class="detail-section">
+                        <div class="detail-label">📍 공연장</div>
+                        <div class="detail-content">${performance.venue}</div>
+                    </div>
+                ` : ''}
+                
+                ${performance.price ? `
+                    <div class="detail-section">
+                        <div class="detail-label">💰 티켓 가격</div>
+                        <div class="detail-content">${performance.price}</div>
+                    </div>
+                ` : ''}
+                
+                ${performance.performers && performance.performers.length > 0 ? `
+                    <div class="detail-section">
+                        <div class="detail-label">👥 출연진</div>
+                        <div class="detail-content">
+                            <ul class="program-list">
+                                ${performance.performers.map(p => `<li>${p}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${performance.program && performance.program.length > 0 ? `
+                    <div class="detail-section">
+                        <div class="detail-label">🎵 프로그램</div>
+                        <div class="detail-content">
+                            <ul class="program-list">
+                                ${performance.program.map(p => `<li>${p}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${performance.description ? `
+                    <div class="detail-section">
+                        <div class="detail-label">📝 설명</div>
+                        <div class="detail-content">${performance.description}</div>
+                    </div>
+                ` : ''}
+                
+                <div class="detail-section">
+                    <div class="detail-label">🔗 원본 URL</div>
+                    <div class="detail-content">
+                        <a href="${performance.url}" target="_blank">${performance.url}</a>
+                    </div>
+                </div>
+                
+                <div class="detail-section">
+                    <div class="detail-label">⏰ 수집 시간</div>
+                    <div class="detail-content">${new Date(performance.scrapedAt).toLocaleString('ko-KR')}</div>
+                </div>
+            `;
+            
+            modalBody.innerHTML = html;
+            modal.style.display = 'block';
+        }
+        
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+        
+        // 모달 외부 클릭시 닫기
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+        
+        // 공연 삭제
+        async function deletePerformance(id) {
+            if (!confirm('이 공연 정보를 삭제하시겠습니까?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/performances/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    showMessage('공연 정보가 삭제되었습니다.', 'success');
+                    loadPerformances();
+                } else {
+                    showMessage('삭제 실패', 'error');
+                }
+            } catch (error) {
+                showMessage(`오류: ${error.message}`, 'error');
+            }
+        }
+        
+        // Enter 키로 스크래핑 실행
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                scrapePerformance();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎼 클래식 공연 정보 스크래퍼</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        input[type="url"] {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="url"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .result-card {
+            background: linear-gradient(135deg, #f8f9ff 0%, #f0f2ff 100%);
+            border: 2px solid #667eea;
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+        
+        .concert-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #4c51bf;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .info-grid {
+            display: grid;
+            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+        
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 1.1em;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .info-content {
+            color: #333;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        .performer-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .performer-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .performer-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .price-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .price-item {
+            background: #667eea;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .save-btn {
+            background: #28a745;
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        .save-btn:hover {
+            background: #218838;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .example-urls {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .example-urls h3 {
+            color: #2c5aa0;
+            margin-bottom: 10px;
+        }
+        
+        .url-link {
+            display: block;
+            color: #2c5aa0;
+            text-decoration: none;
+            margin-bottom: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        
+        .url-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎼 클래식 공연 정보 스크래퍼</h1>
+        
+        <div class="card">
+            <div class="example-urls">
+                <h3>📌 예시 URL (클릭하면 자동 입력):</h3>
+                <a href="#" class="url-link" data-url="https://www.lotteconcerthall.com/kor/Performance/ConcertDetails/260852">
+                    롯데콘서트홀 - 정명훈 & 원 코리아 오케스트라 <베토벤 합창>
+                </a>
+                <a href="#" class="url-link" data-url="https://www.lotteconcerthall.com/kor/Performance/ConcertDetails/260699">
+                    롯데콘서트홀 - 일리야 라쉬코프스키 & 밀레니엄 심포니 오케스트라
+                </a>
+            </div>
+            
+            <div class="input-group">
+                <input 
+                    type="url" 
+                    id="urlInput" 
+                    placeholder="공연 정보 URL을 입력하세요"
+                    value="https://www.lotteconcerthall.com/kor/Performance/ConcertDetails/260852"
+                >
+                <button onclick="startScraping()" id="scrapeBtn">
+                    정보 수집
+                </button>
+            </div>
+            
+            <div id="statusDiv" class="hidden"></div>
+            <div id="resultDiv" class="hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentTaskId = null;
+        let statusCheckInterval = null;
+
+        // 예시 URL 클릭 이벤트
+        document.querySelectorAll('.url-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('urlInput').value = this.dataset.url;
+            });
+        });
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('statusDiv');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+            statusDiv.classList.remove('hidden');
+        }
+
+        function hideStatus() {
+            document.getElementById('statusDiv').classList.add('hidden');
+        }
+
+        function startScraping() {
+            const url = document.getElementById('urlInput').value.trim();
+            const button = document.getElementById('scrapeBtn');
+            const resultDiv = document.getElementById('resultDiv');
+            
+            if (!url) {
+                showStatus('URL을 입력해주세요.', 'error');
+                return;
+            }
+            
+            if (!url.startsWith('http')) {
+                showStatus('올바른 URL을 입력해주세요.', 'error');
+                return;
+            }
+            
+            // UI 상태 변경
+            button.disabled = true;
+            button.innerHTML = '<div class="loading-spinner"></div>스크래핑 중...';
+            resultDiv.classList.add('hidden');
+            showStatus('공연 정보를 수집하고 있습니다...', 'loading');
+            
+            // 스크래핑 시작
+            fetch('/api/scrape', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url: url })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                currentTaskId = data.task_id;
+                checkStatus();
+            })
+            .catch(error => {
+                showStatus(`오류: ${error.message}`, 'error');
+                resetButton();
+            });
+        }
+
+        function checkStatus() {
+            if (!currentTaskId) return;
+            
+            statusCheckInterval = setInterval(() => {
+                fetch(`/api/status/${currentTaskId}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === '완료') {
+                            clearInterval(statusCheckInterval);
+                            showResult(data.result);
+                            showStatus('공연 정보 수집이 완료되었습니다!', 'success');
+                            resetButton();
+                        } else if (data.status.startsWith('오류')) {
+                            clearInterval(statusCheckInterval);
+                            showStatus(data.status, 'error');
+                            resetButton();
+                        }
+                        // 진행중인 경우 계속 대기
+                    })
+                    .catch(error => {
+                        clearInterval(statusCheckInterval);
+                        showStatus(`상태 확인 오류: ${error.message}`, 'error');
+                        resetButton();
+                    });
+            }, 2000);
+        }
+
+        function resetButton() {
+            const button = document.getElementById('scrapeBtn');
+            button.disabled = false;
+            button.innerHTML = '정보 수집';
+        }
+
+        function showResult(data) {
+            if (!data) {
+                showStatus('공연 정보를 가져올 수 없습니다.', 'error');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('resultDiv');
+            let html = `
+                <div class="result-card">
+                    <div class="concert-title">${data.title || '제목 없음'}</div>
+                    <div class="info-grid">
+            `;
+            
+            if (data.date) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">📅 날짜/시간</div>
+                        <div class="info-content">${data.date}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.venue) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">🏛️ 공연장</div>
+                        <div class="info-content">${data.venue}</div>
+                    </div>
+                `;
+            }
+            
+            if (data.performers && data.performers.length > 0) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">👥 출연진</div>
+                        <div class="info-content">
+                            <ul class="performer-list">
+                `;
+                data.performers.slice(0, 10).forEach(performer => {
+                    html += `<li>${performer}</li>`;
+                });
+                if (data.performers.length > 10) {
+                    html += `<li>... 외 ${data.performers.length - 10}명</li>`;
+                }
+                html += `
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (data.program && data.program.length > 0) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">🎵 프로그램</div>
+                        <div class="info-content">
+                `;
+                data.program.forEach(program => {
+                    html += `<div style="margin-bottom: 8px;">${program}</div>`;
+                });
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            if (data.price && data.price.length > 0) {
+                html += `
+                    <div class="info-item">
+                        <div class="info-label">💰 가격</div>
+                        <div class="info-content">
+                            <div class="price-list">
+                `;
+                data.price.forEach(price => {
+                    html += `<span class="price-item">${price}</span>`;
+                });
+                html += `
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                        <div class="info-item">
+                            <div class="info-label">🔗 URL</div>
+                            <div class="info-content">
+                                <a href="${data.url}" target="_blank" style="color: #667eea; text-decoration: none;">
+                                    ${data.url}
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <div class="info-item">
+                            <div class="info-label">⏰ 수집시간</div>
+                            <div class="info-content">${data.scraped_at}</div>
+                        </div>
+                    </div>
+                    
+                    <button class="save-btn" onclick="saveResult()">
+                        💾 JSON 파일로 저장하기
+                    </button>
+                </div>
+            `;
+            
+            resultDiv.innerHTML = html;
+            resultDiv.classList.remove('hidden');
+            
+            // 결과를 전역 변수에 저장
+            window.currentResult = data;
+        }
+
+        function saveResult() {
+            if (!window.currentResult) return;
+            
+            fetch('/api/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(window.currentResult)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus(`파일이 저장되었습니다: ${data.filename}`, 'success');
+                } else {
+                    showStatus(`저장 실패: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                showStatus(`저장 오류: ${error.message}`, 'error');
+            });
+        }
+
+        // Enter 키 처리
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                startScraping();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎭 My Culture Log</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .star-rating {
+            cursor: pointer;
+        }
+        
+        .star-rating .star {
+            color: #d1d5db;
+            transition: color 0.2s;
+        }
+        
+        .star-rating .star.filled {
+            color: #fbbf24;
+        }
+        
+        .star-rating:hover .star:hover,
+        .star-rating:hover .star:hover ~ .star {
+            color: #fbbf24;
+        }
+        
+        .photo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+        
+        .photo-item {
+            aspect-ratio: 3/4;
+            overflow: hidden;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .photo-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .modal-overlay {
+            backdrop-filter: blur(4px);
+        }
+        
+        @media (max-width: 768px) {
+            .photo-grid {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="cultureLogApp()" x-init="init()">
+    <!-- Header -->
+    <header class="gradient-bg text-white py-8">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2">🎭 My Culture Log</h1>
+                    <p class="text-blue-100">나만의 문화생활 기록 공간</p>
+                </div>
+                <button 
+                    @click="showAddModal = true" 
+                    class="bg-white text-purple-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+                >
+                    ➕ 새 기록 추가
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Dashboard -->
+    <div class="container mx-auto px-4 -mt-8">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-2xl font-bold text-gray-800" x-text="stats.total_logs || 0"></div>
+                <div class="text-gray-600">총 관람</div>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-2xl font-bold text-gray-800">
+                    <span x-text="stats.avg_rating || 0"></span>⭐
+                </div>
+                <div class="text-gray-600">평균 평점</div>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-2xl font-bold text-gray-800" x-text="Object.keys(stats.category_stats || {}).length || 0"></div>
+                <div class="text-gray-600">장르 수</div>
+            </div>
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+                <div class="text-2xl font-bold text-gray-800" x-text="Object.values(stats.monthly_stats || {}).reduce((a, b) => a + b, 0) || 0"></div>
+                <div class="text-gray-600">올해 관람</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="container mx-auto px-4 mb-8">
+        <div class="bg-white rounded-xl p-6 shadow-lg">
+            <div class="flex flex-wrap gap-4 items-center">
+                <select x-model="filters.category" @change="loadLogs()" class="border border-gray-300 rounded-lg px-4 py-2">
+                    <option value="">모든 장르</option>
+                    <option value="클래식">🎼 클래식</option>
+                    <option value="연극">🎭 연극</option>
+                    <option value="뮤지컬">🎵 뮤지컬</option>
+                    <option value="전시">🖼️ 전시</option>
+                    <option value="기타">🎪 기타</option>
+                </select>
+                
+                <input 
+                    type="text" 
+                    x-model="filters.search"
+                    @keyup.enter="loadLogs()"
+                    placeholder="제목, 공연장, 출연진 검색..." 
+                    class="border border-gray-300 rounded-lg px-4 py-2 flex-1 min-w-64"
+                >
+                
+                <button 
+                    @click="loadLogs()" 
+                    class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                    🔍 검색
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Culture Logs Grid -->
+    <div class="container mx-auto px-4 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <template x-for="log in logs" :key="log.id">
+                <div class="bg-white rounded-xl overflow-hidden shadow-lg card-hover">
+                    <!-- Photo -->
+                    <div class="h-64 bg-gradient-to-br from-purple-100 to-blue-100 relative overflow-hidden">
+                        <template x-if="log.photos && log.photos.length > 0">
+                            <img 
+                                :src="'/thumbnails/' + log.photos[0].filename" 
+                                :alt="log.title"
+                                class="w-full h-full object-cover"
+                                @click="openPhotoModal(log.photos, 0)"
+                            >
+                        </template>
+                        <template x-if="!log.photos || log.photos.length === 0">
+                            <div class="w-full h-full flex items-center justify-center text-6xl">
+                                <span x-text="getCategoryEmoji(log.category)"></span>
+                            </div>
+                        </template>
+                        
+                        <!-- Category Badge -->
+                        <div class="absolute top-3 left-3 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm">
+                            <span x-text="log.category"></span>
+                        </div>
+                        
+                        <!-- Rating -->
+                        <template x-if="log.rating">
+                            <div class="absolute top-3 right-3 bg-black bg-opacity-60 text-white px-3 py-1 rounded-full text-sm">
+                                <span x-text="log.rating"></span>⭐
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <!-- Content -->
+                    <div class="p-4">
+                        <h3 class="font-bold text-lg mb-2 line-clamp-2" x-text="log.title"></h3>
+                        
+                        <div class="space-y-1 text-sm text-gray-600 mb-3">
+                            <div class="flex items-center">
+                                <span class="w-4">📅</span>
+                                <span x-text="log.date" class="ml-2"></span>
+                            </div>
+                            <template x-if="log.venue">
+                                <div class="flex items-center">
+                                    <span class="w-4">🏛️</span>
+                                    <span x-text="log.venue" class="ml-2"></span>
+                                </div>
+                            </template>
+                        </div>
+                        
+                        <template x-if="log.review">
+                            <p class="text-gray-700 text-sm line-clamp-3 mb-3" x-text="log.review"></p>
+                        </template>
+                        
+                        <div class="flex justify-between items-center">
+                            <button 
+                                @click="openDetailModal(log)"
+                                class="text-purple-600 hover:text-purple-800 font-medium text-sm"
+                            >
+                                자세히 보기 →
+                            </button>
+                            
+                            <button 
+                                @click="deleteLog(log.id)"
+                                class="text-red-500 hover:text-red-700 text-sm"
+                            >
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+        <!-- Empty State -->
+        <template x-if="logs.length === 0 && !loading">
+            <div class="text-center py-16">
+                <div class="text-6xl mb-4">🎭</div>
+                <h3 class="text-xl font-semibold text-gray-700 mb-2">아직 기록이 없어요</h3>
+                <p class="text-gray-500 mb-6">첫 번째 문화생활을 기록해보세요!</p>
+                <button 
+                    @click="showAddModal = true"
+                    class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                    ➕ 첫 기록 추가하기
+                </button>
+            </div>
+        </template>
+        
+        <!-- Loading -->
+        <template x-if="loading">
+            <div class="text-center py-16">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
+                <p class="mt-4 text-gray-600">로딩 중...</p>
+            </div>
+        </template>
+    </div>
+
+    <!-- Pagination -->
+    <template x-if="pagination.pages > 1">
+        <div class="container mx-auto px-4 mb-8">
+            <div class="flex justify-center items-center space-x-2">
+                <button 
+                    @click="changePage(pagination.page - 1)"
+                    :disabled="pagination.page === 1"
+                    class="px-4 py-2 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                    이전
+                </button>
+                
+                <template x-for="page in Array.from({length: pagination.pages}, (_, i) => i + 1)" :key="page">
+                    <button 
+                        @click="changePage(page)"
+                        :class="pagination.page === page ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'"
+                        class="px-4 py-2 rounded-lg border"
+                        x-text="page"
+                    ></button>
+                </template>
+                
+                <button 
+                    @click="changePage(pagination.page + 1)"
+                    :disabled="pagination.page === pagination.pages"
+                    class="px-4 py-2 rounded-lg border disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                    다음
+                </button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Add Modal -->
+    <div x-show="showAddModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-2xl w-full max-h-screen overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold">새 문화생활 기록</h2>
+                    <button @click="closeAddModal()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                
+                <!-- URL 스크래핑 섹션 -->
+                <div class="mb-6 p-4 bg-blue-50 rounded-lg">
+                    <h3 class="font-semibold mb-3">🔗 URL로 정보 자동 입력</h3>
+                    <div class="flex gap-2">
+                        <input 
+                            type="url" 
+                            x-model="scrapeUrl"
+                            placeholder="공연 정보 URL을 입력하세요"
+                            class="flex-1 border border-gray-300 rounded-lg px-4 py-2"
+                        >
+                        <button 
+                            @click="startScraping()"
+                            :disabled="scraping"
+                            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            <span x-show="!scraping">가져오기</span>
+                            <span x-show="scraping">처리중...</span>
+                        </button>
+                    </div>
+                    <div x-show="scrapeStatus" class="mt-3 p-3 bg-white rounded border" x-text="scrapeStatus"></div>
+                </div>
+                
+                <!-- 수동 입력 폼 -->
+                <form @submit.prevent="submitLog()">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">제목 *</label>
+                            <input 
+                                type="text" 
+                                x-model="newLog.title"
+                                required
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                            >
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">장르 *</label>
+                            <select x-model="newLog.category" required class="w-full border border-gray-300 rounded-lg px-4 py-2">
+                                <option value="">선택하세요</option>
+                                <option value="클래식">🎼 클래식</option>
+                                <option value="연극">🎭 연극</option>
+                                <option value="뮤지컬">🎵 뮤지컬</option>
+                                <option value="전시">🖼️ 전시</option>
+                                <option value="기타">🎪 기타</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">관람일 *</label>
+                            <input 
+                                type="date" 
+                                x-model="newLog.date"
+                                required
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                            >
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">공연장</label>
+                            <input 
+                                type="text" 
+                                x-model="newLog.venue"
+                                class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">평점</label>
+                        <div class="star-rating flex space-x-1" @click="setRating($event)">
+                            <template x-for="i in 5" :key="i">
+                                <span 
+                                    class="star text-2xl cursor-pointer"
+                                    :class="{ 'filled': i <= newLog.rating }"
+                                    :data-rating="i"
+                                >
+                                    ⭐
+                                </span>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">관람 후기</label>
+                        <textarea 
+                            x-model="newLog.review"
+                            rows="4"
+                            placeholder="어떤 점이 인상깊었나요?"
+                            class="w-full border border-gray-300 rounded-lg px-4 py-2"
+                        ></textarea>
+                    </div>
+                    
+                    <!-- 사진 업로드 -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">사진</label>
+                        <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <input 
+                                type="file" 
+                                multiple 
+                                accept="image/*"
+                                @change="handlePhotoUpload($event)"
+                                class="hidden"
+                                id="photoUpload"
+                            >
+                            <label for="photoUpload" class="cursor-pointer">
+                                <div class="text-4xl mb-2">📸</div>
+                                <div class="text-gray-600">클릭하여 사진 업로드</div>
+                            </label>
+                        </div>
+                        
+                        <!-- 업로드된 사진 미리보기 -->
+                        <template x-if="newLog.photos.length > 0">
+                            <div class="mt-4 photo-grid">
+                                <template x-for="(photo, index) in newLog.photos" :key="index">
+                                    <div class="photo-item relative">
+                                        <img 
+                                            :src="'/thumbnails/' + photo.filename" 
+                                            :alt="photo.original_name"
+                                            class="w-full h-full object-cover"
+                                        >
+                                        <button 
+                                            @click="removePhoto(index)"
+                                            class="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-4">
+                        <button 
+                            type="button" 
+                            @click="closeAddModal()"
+                            class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                            취소
+                        </button>
+                        <button 
+                            type="submit"
+                            :disabled="submitting"
+                            class="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                        >
+                            <span x-show="!submitting">저장</span>
+                            <span x-show="submitting">저장 중...</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Modal -->
+    <div x-show="showDetailModal" x-cloak class="fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-4xl w-full max-h-screen overflow-y-auto">
+            <div class="p-6" x-show="selectedLog">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold" x-text="selectedLog?.title"></h2>
+                    <button @click="showDetailModal = false" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+                </div>
+                
+                <!-- Photos -->
+                <template x-if="selectedLog?.photos && selectedLog.photos.length > 0">
+                    <div class="mb-6">
+                        <div class="photo-grid">
+                            <template x-for="(photo, index) in selectedLog.photos" :key="index">
+                                <div class="photo-item">
+                                    <img 
+                                        :src="'/thumbnails/' + photo.filename" 
+                                        :alt="photo.original_name"
+                                        class="w-full h-full object-cover"
+                                        @click="openPhotoModal(selectedLog.photos, index)"
+                                    >
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                
+                <!-- Info -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h3 class="font-semibold mb-2">기본 정보</h3>
+                        <div class="space-y-2 text-sm">
+                            <div><strong>장르:</strong> <span x-text="selectedLog?.category"></span></div>
+                            <div><strong>관람일:</strong> <span x-text="selectedLog?.date"></span></div>
+                            <div x-show="selectedLog?.venue"><strong>공연장:</strong> <span x-text="selectedLog?.venue"></span></div>
+                            <div x-show="selectedLog?.rating"><strong>평점:</strong> <span x-text="selectedLog?.rating"></span>⭐</div>
+                        </div>
+                    </div>
+                    
+                    <div x-show="selectedLog?.performers && JSON.parse(selectedLog.performers || '[]').length > 0">
+                        <h3 class="font-semibold mb-2">출연진</h3>
+                        <div class="text-sm">
+                            <template x-for="performer in JSON.parse(selectedLog?.performers || '[]')" :key="performer">
+                                <div x-text="performer" class="mb-1"></div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                
+                <template x-if="selectedLog?.review">
+                    <div class="mb-6">
+                        <h3 class="font-semibold mb-2">관람 후기</h3>
+                        <p class="text-gray-700 whitespace-pre-wrap" x-text="selectedLog.review"></p>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Modal -->
+    <div x-show="showPhotoModal" x-cloak class="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-60">
+        <div class="relative max-w-full max-h-full">
+            <button @click="showPhotoModal = false" class="absolute top-4 right-4 text-white text-3xl z-10">×</button>
+            
+            <template x-if="currentPhotos && currentPhotos.length > 0">
+                <div class="flex items-center space-x-4">
+                    <button 
+                        @click="previousPhoto()"
+                        x-show="currentPhotos.length > 1"
+                        class="text-white text-3xl hover:text-gray-300"
+                    >
+                        ‹
+                    </button>
+                    
+                    <img 
+                        :src="'/uploads/' + currentPhotos[currentPhotoIndex]?.filename" 
+                        :alt="currentPhotos[currentPhotoIndex]?.original_name"
+                        class="max-w-full max-h-screen object-contain"
+                    >
+                    
+                    <button 
+                        @click="nextPhoto()"
+                        x-show="currentPhotos.length > 1"
+                        class="text-white text-3xl hover:text-gray-300"
+                    >
+                        ›
+                    </button>
+                </div>
+            </template>
+            
+            <template x-if="currentPhotos && currentPhotos.length > 1">
+                <div class="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white">
+                    <span x-text="currentPhotoIndex + 1"></span> / <span x-text="currentPhotos.length"></span>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <script>
+        function cultureLogApp() {
+            return {
+                // Data
+                logs: [],
+                stats: {},
+                loading: false,
+                submitting: false,
+                scraping: false,
+                
+                // Modal states
+                showAddModal: false,
+                showDetailModal: false,
+                showPhotoModal: false,
+                selectedLog: null,
+                
+                // Photo modal
+                currentPhotos: [],
+                currentPhotoIndex: 0,
+                
+                // Filters & Pagination
+                filters: {
+                    category: '',
+                    search: ''
+                },
+                pagination: {
+                    page: 1,
+                    per_page: 12,
+                    pages: 1,
+                    total: 0
+                },
+                
+                // Forms
+                newLog: {
+                    title: '',
+                    category: '',
+                    date: '',
+                    venue: '',
+                    performers: [],
+                    program: [],
+                    price: [],
+                    rating: 0,
+                    review: '',
+                    photos: [],
+                    source_url: ''
+                },
+                
+                // Scraping
+                scrapeUrl: '',
+                scrapeStatus: '',
+                currentTaskId: null,
+                
+                // Initialize
+                init() {
+                    this.loadLogs();
+                    this.loadStats();
+                    // Set today's date as default
+                    this.newLog.date = new Date().toISOString().split('T')[0];
+                },
+                
+                // API calls
+                async loadLogs() {
+                    this.loading = true;
+                    try {
+                        const params = new URLSearchParams({
+                            page: this.pagination.page,
+                            per_page: this.pagination.per_page,
+                            ...(this.filters.category && { category: this.filters.category }),
+                            ...(this.filters.search && { search: this.filters.search })
+                        });
+                        
+                        const response = await fetch(`/api/logs?${params}`);
+                        const data = await response.json();
+                        
+                        this.logs = data.logs;
+                        this.pagination = {
+                            page: data.page,
+                            per_page: data.per_page,
+                            pages: data.pages,
+                            total: data.total
+                        };
+                    } catch (error) {
+                        console.error('Error loading logs:', error);
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+                
+                async loadStats() {
+                    try {
+                        const response = await fetch('/api/stats');
+                        this.stats = await response.json();
+                    } catch (error) {
+                        console.error('Error loading stats:', error);
+                    }
+                },
+                
+                async submitLog() {
+                    this.submitting = true;
+                    try {
+                        const response = await fetch('/api/logs', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newLog)
+                        });
+                        
+                        if (response.ok) {
+                            this.closeAddModal();
+                            this.loadLogs();
+                            this.loadStats();
+                        }
+                    } catch (error) {
+                        console.error('Error submitting log:', error);
+                    } finally {
+                        this.submitting = false;
+                    }
+                },
+                
+                async deleteLog(id) {
+                    if (!confirm('정말 삭제하시겠습니까?')) return;
+                    
+                    try {
+                        const response = await fetch(`/api/logs/${id}`, { method: 'DELETE' });
+                        if (response.ok) {
+                            this.loadLogs();
+                            this.loadStats();
+                        }
+                    } catch (error) {
+                        console.error('Error deleting log:', error);
+                    }
+                },
+                
+                // Scraping
+                async startScraping() {
+                    if (!this.scrapeUrl) return;
+                    
+                    this.scraping = true;
+                    this.scrapeStatus = '정보를 가져오는 중...';
+                    
+                    try {
+                        const response = await fetch('/api/scrape', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ url: this.scrapeUrl })
+                        });
+                        
+                        const data = await response.json();
+                        this.currentTaskId = data.task_id;
+                        this.checkScrapeStatus();
+                    } catch (error) {
+                        this.scrapeStatus = '오류가 발생했습니다.';
+                        this.scraping = false;
+                    }
+                },
+                
+                async checkScrapeStatus() {
+                    if (!this.currentTaskId) return;
+                    
+                    try {
+                        const response = await fetch(`/api/scrape-status/${this.currentTaskId}`);
+                        const data = await response.json();
+                        
+                        if (data.status === '완료') {
+                            this.fillFormFromScrapeResult(data.result);
+                            this.scrapeStatus = '정보 가져오기 완료!';
+                            this.scraping = false;
+                        } else if (data.status.startsWith('오류')) {
+                            this.scrapeStatus = data.status;
+                            this.scraping = false;
+                        } else {
+                            setTimeout(() => this.checkScrapeStatus(), 2000);
+                        }
+                    } catch (error) {
+                        this.scrapeStatus = '상태 확인 중 오류가 발생했습니다.';
+                        this.scraping = false;
+                    }
+                },
+                
+                fillFormFromScrapeResult(result) {
+                    if (!result) return;
+                    
+                    this.newLog.title = result.title || '';
+                    this.newLog.venue = result.venue || '';
+                    this.newLog.performers = result.performers || [];
+                    this.newLog.program = result.program || [];
+                    this.newLog.price = result.price || [];
+                    this.newLog.source_url = result.url || '';
+                    
+                    // 날짜 파싱
+                    if (result.date) {
+                        const dateMatch = result.date.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                        if (dateMatch) {
+                            this.newLog.date = `${dateMatch[1]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[3].padStart(2, '0')}`;
+                        }
+                    }
+                    
+                    // 장르 추론
+                    if (result.title || result.program.join(' ')) {
+                        const text = (result.title + ' ' + result.program.join(' ')).toLowerCase();
+                        if (text.includes('베토벤') || text.includes('모차르트') || text.includes('바흐') || text.includes('symphony') || text.includes('concerto')) {
+                            this.newLog.category = '클래식';
+                        }
+                    }
+                },
+                
+                // Photo handling
+                async handlePhotoUpload(event) {
+                    const files = Array.from(event.target.files);
+                    if (files.length === 0) return;
+                    
+                    const formData = new FormData();
+                    files.forEach(file => formData.append('photos', file));
+                    
+                    try {
+                        const response = await fetch('/api/upload-photos', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const data = await response.json();
+                        if (data.success) {
+                            this.newLog.photos.push(...data.files);
+                        }
+                    } catch (error) {
+                        console.error('Photo upload error:', error);
+                    }
+                },
+                
+                removePhoto(index) {
+                    this.newLog.photos.splice(index, 1);
+                },
+                
+                openPhotoModal(photos, index) {
+                    this.currentPhotos = photos;
+                    this.currentPhotoIndex = index;
+                    this.showPhotoModal = true;
+                },
+                
+                previousPhoto() {
+                    this.currentPhotoIndex = this.currentPhotoIndex > 0 ? this.currentPhotoIndex - 1 : this.currentPhotos.length - 1;
+                },
+                
+                nextPhoto() {
+                    this.currentPhotoIndex = this.currentPhotoIndex < this.currentPhotos.length - 1 ? this.currentPhotoIndex + 1 : 0;
+                },
+                
+                // Utilities
+                getCategoryEmoji(category) {
+                    const emojis = {
+                        '클래식': '🎼',
+                        '연극': '🎭',
+                        '뮤지컬': '🎵',
+                        '전시': '🖼️',
+                        '기타': '🎪'
+                    };
+                    return emojis[category] || '🎪';
+                },
+                
+                setRating(event) {
+                    const rating = parseInt(event.target.dataset.rating);
+                    this.newLog.rating = rating;
+                },
+                
+                changePage(page) {
+                    if (page >= 1 && page <= this.pagination.pages) {
+                        this.pagination.page = page;
+                        this.loadLogs();
+                    }
+                },
+                
+                openDetailModal(log) {
+                    this.selectedLog = log;
+                    this.showDetailModal = true;
+                },
+                
+                closeAddModal() {
+                    this.showAddModal = false;
+                    this.resetForm();
+                },
+                
+                resetForm() {
+                    this.newLog = {
+                        title: '',
+                        category: '',
+                        date: new Date().toISOString().split('T')[0],
+                        venue: '',
+                        performers: [],
+                        program: [],
+                        price: [],
+                        rating: 0,
+                        review: '',
+                        photos: [],
+                        source_url: ''
+                    };
+                    this.scrapeUrl = '';
+                    this.scrapeStatus = '';
+                    this.scraping = false;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
