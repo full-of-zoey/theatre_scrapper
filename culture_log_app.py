@@ -37,7 +37,7 @@ def init_db():
     """데이터베이스 초기화"""
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    
+
     # 문화생활 기록 테이블
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS culture_logs (
@@ -57,9 +57,10 @@ def init_db():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
+
     conn.commit()
     conn.close()
+    print(f"✅ 데이터베이스 초기화 완료: {DATABASE}")
 
 def create_thumbnail(image_path, thumbnail_path, size=(300, 400)):
     """이미지 썸네일 생성"""
@@ -350,11 +351,11 @@ def delete_log(log_id):
     try:
         conn = sqlite3.connect(DATABASE)
         cursor = conn.cursor()
-        
+
         # 먼저 사진 파일들 삭제
         cursor.execute("SELECT photos FROM culture_logs WHERE id = ?", (log_id,))
         result = cursor.fetchone()
-        
+
         if result and result[0]:
             photos = json.loads(result[0])
             for photo in photos:
@@ -365,14 +366,40 @@ def delete_log(log_id):
                         os.remove(os.path.join(THUMBNAILS_FOLDER, filename))
                     except:
                         pass
-        
+
         # 레코드 삭제
         cursor.execute("DELETE FROM culture_logs WHERE id = ?", (log_id,))
         conn.commit()
         conn.close()
-        
+
         return jsonify({'success': True})
-        
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/reset-database', methods=['POST'])
+def reset_database():
+    """데이터베이스 완전 초기화 (개발용)"""
+    try:
+        # 모든 업로드된 파일 삭제
+        import shutil
+        if os.path.exists(UPLOAD_FOLDER):
+            shutil.rmtree(UPLOAD_FOLDER)
+        if os.path.exists(THUMBNAILS_FOLDER):
+            shutil.rmtree(THUMBNAILS_FOLDER)
+
+        # 폴더 재생성
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        os.makedirs(THUMBNAILS_FOLDER, exist_ok=True)
+
+        # 데이터베이스 삭제 및 재생성
+        if os.path.exists(DATABASE):
+            os.remove(DATABASE)
+
+        init_db()
+
+        return jsonify({'success': True, 'message': '데이터베이스가 완전히 초기화되었습니다.'})
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
